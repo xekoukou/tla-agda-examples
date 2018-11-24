@@ -1,37 +1,42 @@
-open import Prelude.Nat
-open import Prelude.Functor
-open import Prelude.Fin
-open import Prelude.Empty
-
 module TCommit where
+
+open import Data.Nat
+open import Data.Fin
+open import Data.Sum
+open import Relation.Nullary
+open import Data.Vec hiding ([_])
+open import Data.Unit using (⊤ ; tt)
+open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
+open import Relation.Binary.PropositionalEquality hiding ([_])
+open import Function using (case_of_)
 
 
 open import TLA.Def
 open import TLA.Utils
 
 variable
-  RM : Nat
+  RM : ℕ
   
 data RMState : Set where
   working prepared committed aborted : RMState
 
-TCVars : (RM : Nat) → VSet RM
+TCVars : (RM : ℕ) → VSet RM
 TCVars RM = VS RMState RM
 
 
 -- Should I use Heterogeneous Equality here ?
 
 TCInit : System (TCVars RM) → Set
-TCInit {zero} sys = ⊤′
+TCInit {zero} sys = ⊤
 TCInit {suc RM} sys = fst sys ≡ working × TCInit (snd sys)
 
 
 canCommit : System (TCVars RM) → Set
-canCommit {zero} sys = ⊤′
+canCommit {zero} sys = ⊤
 canCommit {suc RM} sys = ((fst sys ≡ prepared) ⊎ (fst sys ≡ committed)) × canCommit (snd sys)
 
 notCommitted : System (TCVars RM) → Set
-notCommitted {zero} sys = ⊤′
+notCommitted {zero} sys = ⊤
 notCommitted {suc RM} sys = (¬ (fst sys ≡ committed)) × canCommit (snd sys)
 
 
@@ -63,7 +68,7 @@ resp (Decide {suc RM}) zero sys nsys
       × fst nsys ≡ aborted)
 resp (Decide {suc RM}) (suc e) sys nsys = fst sys ≡ fst nsys × resp Decide e (snd sys) (snd nsys)
 
-TCE : Nat → VSet {lzero} 2
+TCE : ℕ → VSet 2
 TCE RM = VS (Fin RM) 2
 
 TCSpec : Spec (TCVars RM) (TCE RM)

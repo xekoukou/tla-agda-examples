@@ -10,7 +10,7 @@ open import Data.Unit using (⊤ ; tt)
 open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Function using (case_of_)
-
+open import Level renaming (zero to lzero ; suc to lsuc ; Lift to ℓ↑)
 
 open import LTL.Core
 open import LTL.Stateless
@@ -49,11 +49,11 @@ resp bigToSmall e (small , big , _) (small' , big' , _)
         ; (no _) → small' ≡ 3 × big' ≡ big ∸ (3 ∸ small)}
 
 
-DHE = V⊤ 6
+DHE = V⊤ 7
 
 DHSpec : Spec DHVars DHE
 DHSpec = fillSmall ∷ₛₚ fillBig ∷ₛₚ emptySmall ∷ₛₚ emptyBig
-         ∷ₛₚ smallToBig ∷ₛₚ bigToSmall ∷ₛₚ []ₛₚ
+         ∷ₛₚ smallToBig ∷ₛₚ bigToSmall ∷ₛₚ stAction ∷ₛₚ []ₛₚ
 
 TypeOK : System DHVars → Set
 TypeOK (fst , snd , _) 
@@ -63,13 +63,12 @@ TypeOK (fst , snd , _)
 
 
 TypeOKInd : (beh : (System DHVars) ʷ) → (pe : (DHE toUS) ʷ)
-            → [ Restr DHSpec beh pe ⇒ ⟨ TypeOK ⟩ $ beh ⇒ ⟨ TypeOK ⟩ $ (○ beh) ]
+            → [ (DHSpec $ₛₚₜ pe) beh ⇒ ⟨ TypeOK ⟩ $ beh ⇒ ⟨ TypeOK ⟩ $ (○ beh) ]
 TypeOKInd beh pe n rst ptok with pe n | beh n | beh (suc n)
-TypeOKInd beh pe n (u→ refl) ptok | pen | sys | .sys = ptok
-TypeOKInd beh pe n ((_ , refl , refl) ←u) (a , b , c , d) | e ←u | sys | .3 , .(snd sys)
+TypeOKInd beh pe n (_ , refl , refl) (a , b , c , d) | e ←u | sys | .3 , .(snd sys)
   = {!!} , ({!!} , (c , d))
-TypeOKInd beh pe n (rst ←u) ptok | u→ (e ←u) | sys | nsys = {!!}
-TypeOKInd beh pe n (rst ←u) ptok | u→ (u→ pen) | sys | nsys = {!!}
+TypeOKInd beh pe n rst ptok | u→ (e ←u) | sys | nsys = {!!}
+TypeOKInd beh pe n rst ptok | u→ (u→ pen) | sys | nsys = {!!}
 
 TypeOK! : (beh : (System DHVars) ʷ)
           → (init : fst (! beh) ≡ 0 × fst (snd (! beh)) ≡ 0 ) → ! ( ⟨ TypeOK ⟩ $ beh )
@@ -77,5 +76,5 @@ TypeOK! beh (fst , snd) = {!!} , {!!}
 
 
 TypeOKProof : (beh : (System DHVars) ʷ) → (pe : (DHE toUS) ʷ)
-         → (init : fst (! beh) ≡ 0 × fst (snd (! beh)) ≡ 0 ) → [ Restr DHSpec beh pe ] → [ ⟨ TypeOK ⟩ $ beh ]
+         → (init : fst (! beh) ≡ 0 × fst (snd (! beh)) ≡ 0 ) → [ (DHSpec $ₛₚₜ pe) beh ] → [ ⟨ TypeOK ⟩ $ beh ]
 TypeOKProof beh pe init rst = indn (TypeOKInd beh pe $ rst) (TypeOK! beh init)

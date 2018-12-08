@@ -4,12 +4,13 @@ open import Data.Nat
 open import Data.Fin
 open import Data.Sum
 open import Relation.Nullary
+open import Data.Empty
 open import Data.Vec hiding ([_])
 open import Data.Unit using (⊤ ; tt)
 open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Function using (case_of_)
-
+open import Data.Product.Relation.Pointwise.NonDependent
 
 open import TLA.Def
 open import TLA.Utils
@@ -20,11 +21,38 @@ variable
 data RMState : Set where
   working prepared committed aborted : RMState
 
+
+rmDec : (a b : RMState) → Dec (a ≡ b)
+rmDec working working = yes refl
+rmDec working prepared = no (λ ())
+rmDec working committed = no (λ ())
+rmDec working aborted = no (λ ())
+rmDec prepared working = no (λ ())
+rmDec prepared prepared = yes refl
+rmDec prepared committed = no (λ ())
+rmDec prepared aborted = no (λ ())
+rmDec committed working = no (λ ())
+rmDec committed prepared = no (λ ())
+rmDec committed committed = yes refl
+rmDec committed aborted = no (λ ())
+rmDec aborted working = no (λ ())
+rmDec aborted prepared = no (λ ())
+rmDec aborted committed = no (λ ())
+rmDec aborted aborted = yes refl
+
+
 TCVars : (RM : ℕ) → VSet RM
 TCVars RM = VS RMState RM
 
+rmDecV : {RM : ℕ} → (a b : System (TCVars RM)) → Dec (a ≡ b)
+rmDecV {zero} a b = yes refl
+rmDecV {suc RM} a b
+  = case rmDecV (snd a) (snd b) of
+      λ { (yes p) → case rmDec (fst a) (fst b)
+                      of λ { (yes q) → yes (≡×≡⇒≡ (q , p))
+                           ; (no ¬q) → no λ { refl → ⊥-elim (¬q refl)}}
+        ; (no ¬p) → no (λ {refl → ⊥-elim (¬p refl)})}
 
--- Should I use Heterogeneous Equality here ?
 
 TCInit : System (TCVars RM) → Set
 TCInit {zero} sys = ⊤
@@ -37,39 +65,31 @@ canCommit {suc RM} sys = ((fst sys ≡ prepared) ⊎ (fst sys ≡ committed)) ×
 
 notCommitted : System (TCVars RM) → Set
 notCommitted {zero} sys = ⊤
-notCommitted {suc RM} sys = (¬ (fst sys ≡ committed)) × canCommit (snd sys)
-
+notCommitted {suc RM} sys = (¬ (fst sys ≡ committed)) × notCommitted (snd sys)
 
 
 Prepare : Action (Fin RM) (TCVars RM)
 cond (Prepare {zero}) ()
-cond (Prepare {suc RM}) zero sys = fst sys ≡ working
-cond (Prepare {suc RM}) (suc e) sys = cond Prepare e (snd sys)
+cond (Prepare {suc RM}) e sys = sys at e ≡ working
 resp (Prepare {zero}) ()
-resp (Prepare {suc RM}) zero sys nsys = fst nsys ≡ prepared
-resp (Prepare {suc RM}) (suc e) sys nsys = resp Prepare e (snd sys) (snd nsys)
+resp (Prepare {suc RM}) e sys nsys = nsys at e ≡ prepared × sys ≡ nsys except e
 
 
 Decide : Action (Fin RM) (TCVars RM)
 cond (Decide {zero}) ()
-cond (Decide {suc RM}) zero sys
-  =   (fst sys ≡ prepared
-      × canCommit sys)
-    ⊎ (((fst sys ≡ prepared) ⊎ (fst sys ≡ working))
-      × notCommitted sys)
-cond (Decide {suc RM}) (suc e) sys = cond Decide e (snd sys)
+cond (Decide {suc RM}) e sys
+  =   (sys at e ≡ prepared × canCommit sys)
+    ⊎ (sys at e ≡ prepared ⊎ sys at e ≡ working) × notCommitted sys
 resp (Decide {zero}) ()
-resp (Decide {suc RM}) zero sys nsys
-  =   (fst sys ≡ prepared
-      × canCommit sys
-      × fst nsys ≡ committed)
-    ⊎ (((fst sys ≡ prepared) ⊎ (fst sys ≡ working))
-      × notCommitted sys
-      × fst nsys ≡ aborted)
-resp (Decide {suc RM}) (suc e) sys nsys = fst sys ≡ fst nsys × resp Decide e (snd sys) (snd nsys)
+resp (Decide {suc RM}) e sys nsys
+  =     ((sys at e ≡ prepared × canCommit sys × nsys at e ≡ committed)
+      ⊎ ((sys at e ≡ prepared ⊎ sys at e ≡ working) × notCommitted sys × (nsys at e ≡ aborted)))
+    × sys ≡ nsys except e
 
-TCE : ℕ → VSet 2
-TCE RM = VS (Fin RM) 2
 
-TCSpec : Spec (TCVars RM) (TCE RM)
-TCSpec = Prepare ∷ₛₚ Decide ∷ₛₚ []ₛₚ
+
+TCE : ℕ → (k : ℕ) → VSet k
+TCE RM k = VS (Fin RM) k
+
+tcspec : Spec (TCVars RM) (⊤ ∷ TCE RM 2)
+tcspec = stAction ∷ₛₚ Prepare ∷ₛₚ Decide ∷ₛₚ []ₛₚ

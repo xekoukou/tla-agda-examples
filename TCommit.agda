@@ -60,31 +60,32 @@ TCInit {suc RM} sys = fst sys ≡ working × TCInit (snd sys)
 
 
 canCommit : System (TCVars RM) → Set
-canCommit {zero} sys = ⊤
-canCommit {suc RM} sys = ((fst sys ≡ prepared) ⊎ (fst sys ≡ committed)) × canCommit (snd sys)
+canCommit {RM} sys = (e : Fin RM) → (sys at e ≡ prepared) ⊎ (sys at e ≡ committed)
+
+canCommit′ : System (TCVars RM) → (e : Fin RM) →  Set
+canCommit′ sys e = (sys at e ≡ prepared) ⊎ (sys at e ≡ committed)
+
 
 notCommitted : System (TCVars RM) → Set
-notCommitted {zero} sys = ⊤
-notCommitted {suc RM} sys = (¬ (fst sys ≡ committed)) × notCommitted (snd sys)
+notCommitted {RM} sys = (e : Fin RM) → ¬ (sys at e ≡ committed)
 
 
 Prepare : Action (Fin RM) (TCVars RM)
 cond (Prepare {zero}) ()
 cond (Prepare {suc RM}) e sys = sys at e ≡ working
 resp (Prepare {zero}) ()
-resp (Prepare {suc RM}) e sys nsys = nsys at e ≡ prepared × sys ≡ nsys except e
+resp (Prepare {suc RM}) e sys nsys = nsys ≡ sys Except e != λ v nv → nv ≡ prepared
 
 
 Decide : Action (Fin RM) (TCVars RM)
 cond (Decide {zero}) ()
 cond (Decide {suc RM}) e sys
   =   (sys at e ≡ prepared × canCommit sys)
-    ⊎ (sys at e ≡ prepared ⊎ sys at e ≡ working) × notCommitted sys
+    ⊎ notCommitted sys
 resp (Decide {zero}) ()
 resp (Decide {suc RM}) e sys nsys
-  =     ((sys at e ≡ prepared × canCommit sys × nsys at e ≡ committed)
-      ⊎ ((sys at e ≡ prepared ⊎ sys at e ≡ working) × notCommitted sys × (nsys at e ≡ aborted)))
-    × sys ≡ nsys except e
+  =  nsys ≡ sys Except e != λ v nv →   v ≡ prepared × canCommit sys × nv ≡ committed
+                                     ⊎ notCommitted sys × nv ≡ aborted 
 
 
 
